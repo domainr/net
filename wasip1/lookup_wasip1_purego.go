@@ -11,12 +11,12 @@ func init() {
 	net.DefaultResolver.Dial = DialContext
 }
 
-func lookupAddr(context, network, address string) (net.Addr, error) {
+func lookupAddr(context, network, address string) ([]net.Addr, error) {
 	switch network {
 	case "tcp", "tcp4", "tcp6":
 	case "udp", "udp4", "udp6":
 	case "unix", "unixgram":
-		return &net.UnixAddr{Name: address, Net: network}, nil
+		return []net.Addr{&net.UnixAddr{Name: address, Net: network}}, nil
 	default:
 		return nil, net.UnknownNetworkError(network)
 	}
@@ -43,37 +43,41 @@ func lookupAddr(context, network, address string) (net.Addr, error) {
 	if err != nil {
 		return nil, err
 	}
+	addrs := make([]net.Addr, 0, len(ips))
 	if network == "tcp" || network == "tcp4" {
 		for _, ip := range ips {
 			if len(ip) == net.IPv4len {
-				return &net.TCPAddr{IP: ip, Port: port}, nil
+				addrs = append(addrs, &net.TCPAddr{IP: ip, Port: port})
 			}
 		}
 	}
 	if network == "tcp" || network == "tcp6" {
 		for _, ip := range ips {
 			if len(ip) == net.IPv6len {
-				return &net.TCPAddr{IP: ip, Port: port}, nil
+				addrs = append(addrs, &net.TCPAddr{IP: ip, Port: port})
 			}
 		}
 	}
 	if network == "udp" || network == "udp4" {
 		for _, ip := range ips {
 			if len(ip) == net.IPv4len {
-				return &net.UDPAddr{IP: ip, Port: port}, nil
+				addrs = append(addrs, &net.UDPAddr{IP: ip, Port: port})
 			}
 		}
 	}
 	if network == "udp" || network == "udp6" {
 		for _, ip := range ips {
 			if len(ip) == net.IPv6len {
-				return &net.UDPAddr{IP: ip, Port: port}, nil
+				addrs = append(addrs, &net.UDPAddr{IP: ip, Port: port})
 			}
 		}
 	}
-	return nil, &net.DNSError{
-		Err:        "lookup failed",
-		Name:       hostname,
-		IsNotFound: true,
+	if len(addrs) == 0 {
+		return nil, &net.DNSError{
+			Err:        "lookup failed",
+			Name:       hostname,
+			IsNotFound: true,
+		}
 	}
+	return addrs, nil
 }

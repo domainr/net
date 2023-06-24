@@ -10,11 +10,13 @@ import (
 
 // Listen announces on the local network address.
 func Listen(network, address string) (net.Listener, error) {
-	addr, err := lookupAddr("listen", network, address)
+	addrs, err := lookupAddr("listen", network, address)
 	if err != nil {
 		addr := &netAddr{network, address}
 		return nil, listenErr(addr, err)
 	}
+	// TODO: implement dual-stack listening
+	addr := addrs[0]
 	lstn, err := listenAddr(addr)
 	if err != nil {
 		return nil, listenErr(addr, err)

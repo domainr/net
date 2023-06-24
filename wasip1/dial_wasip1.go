@@ -86,11 +86,13 @@ func Dial(network, address string) (net.Conn, error) {
 
 // DialContext is a variant of Dial that accepts a context.
 func DialContext(ctx context.Context, network, address string) (net.Conn, error) {
-	addr, err := lookupAddr("dial", network, address)
+	addrs, err := lookupAddr("dial", network, address)
 	if err != nil {
 		addr := &netAddr{network, address}
 		return nil, dialErr(addr, err)
 	}
+	// TODO: implement dual-stack dialing (happy eyeballs, etc)
+	addr := addrs[0]
 	conn, err := dialAddr(ctx, addr)
 	if err != nil {
 		return nil, dialErr(addr, err)

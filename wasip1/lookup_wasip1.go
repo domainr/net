@@ -27,7 +27,7 @@ func init() {
 	net.DefaultResolver.Dial = dialResolverNotSupported
 }
 
-func lookupAddr(op, network, address string) (net.Addr, error) {
+func lookupAddr(op, network, address string) ([]net.Addr, error) {
 	var hints addrInfo
 	switch network {
 	case "tcp", "tcp4", "tcp6":
@@ -37,7 +37,7 @@ func lookupAddr(op, network, address string) (net.Addr, error) {
 		hints.socketType = SOCK_DGRAM
 		hints.protocol = IPPROTO_UDP
 	case "unix", "unixgram":
-		return &net.UnixAddr{Name: address, Net: network}, nil
+		return []net.Addr{&net.UnixAddr{Name: address, Net: network}}, nil
 	default:
 		return nil, net.UnknownNetworkError(network)
 	}
@@ -70,27 +70,37 @@ func lookupAddr(op, network, address string) (net.Addr, error) {
 		return nil, newOpError(op, addr, os.NewSyscallError("getaddrinfo", err))
 	}
 	results = results[:n]
+	addrs := make([]net.Addr, 0, len(results))
 	for _, r := range results {
 		var ip net.IP
 		var port int
 		switch a := r.address.(type) {
 		case *sockaddrInet4:
+			if hints.family == AF_INET6 {
+				continue
+			}
 			ip = a.addr[:]
 			port = a.port
 		case *sockaddrInet6:
+			if hints.family == AF_INET {
+				continue
+			}
 			ip = a.addr[:]
 			port = a.port
 		}
 		switch network {
 		case "tcp", "tcp4", "tcp6":
-			return &net.TCPAddr{IP: ip, Port: port}, nil
+			addrs = append(addrs, &net.TCPAddr{IP: ip, Port: port})
 		case "udp", "udp4", "udp6":
-			return &net.UDPAddr{IP: ip, Port: port}, nil
+			addrs = append(addrs, &net.UDPAddr{IP: ip, Port: port})
 		}
 	}
-	return nil, &net.DNSError{
-		Err:        "lookup failed",
-		Name:       hostname,
-		IsNotFound: true,
+	if len(addrs) == 0 {
+		return nil, &net.DNSError{
+			Err:        "lookup failed",
+			Name:       hostname,
+			IsNotFound: true,
+		}
 	}
+	return addrs, nil
 }
